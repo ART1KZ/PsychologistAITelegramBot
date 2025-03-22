@@ -5,19 +5,12 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon -r dotenv/config ./src/index.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ART1KZ/PsychologistAITelegramBot.git"
+    "dev": "nodemon -r dotenv/config ./src/index.js",
+    "start": "node -r dotenv/config ./src/index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/ART1KZ/PsychologistAITelegramBot/issues"
-  },
-  "homepage": "https://github.com/ART1KZ/PsychologistAITelegramBot#readme",
   "description": "",
   "dependencies": {
     "dotenv": "^16.4.7",
