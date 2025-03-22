@@ -1,6 +1,18 @@
 import { Bot, InlineKeyboard, session } from "grammy";
 import { psychologistPrompt } from "./systemPrompt.js";
 
+// Проверка переменных окружения
+if (
+    !process.env.BOT_TOKEN ||
+    !process.env.AI_API_URL ||
+    !process.env.AI_API_TOKEN
+) {
+    console.error(
+        "Ошибка: Не заданы BOT_TOKEN, AI_API_URL или AI_API_TOKEN в .env"
+    );
+    process.exit(1);
+}
+
 const bot = new Bot(process.env.BOT_TOKEN);
 
 bot.use(
@@ -37,28 +49,33 @@ bot.on("callback_query:data", async (ctx) => {
         case "start_chat":
             await handleStartChat(ctx);
             break;
+        case "support":
+            await handleSupport(ctx);
+            break;
         case "cancel":
             await sendMainMenu(ctx, false);
             break;
         default:
-            await sendErrorMessage(ctx);
+            await sendErrorMessage(null, ctx, false);
             break;
     }
 });
+
 bot.on("message", async (ctx) => {
     if (!ctx.session.isChatting || !ctx.message.text) {
         await sendDontUnderstandMessage(ctx);
         return;
     }
-
     await handleChatMessage(ctx);
 });
 
 bot.catch(async (error, ctx) => {
+    console.error("Глобальная ошибка:", error);
     await sendErrorMessage(error, ctx);
 });
 
-bot.start();
+bot.start()
+console.log("Бот включен")
 
 async function sendMainMenu(ctx, isNewMessage = true) {
     ctx.session.isChatting = false;
@@ -68,40 +85,55 @@ async function sendMainMenu(ctx, isNewMessage = true) {
         .text("🆘 Я в опасности", "in_danger")
         .text("😔 Мне плохо", "feeling_bad")
         .row()
-        .text("🚨 Экстренная помощь", "emergency_help")
-        .row()
         .text("💬 Начать чат", "start_chat")
+        .text("🤝 Поддержка", "support")
+        .row()
+        .text("🚨 Экстренная помощь", "emergency_help")
         .row()
         .url("📝 Пройти тест на уровень стресса", process.env.STRESS_TEST_URL);
 
-    if (isNewMessage) {
-        return await ctx.reply(botMessage, {
+    try {
+        if (isNewMessage) {
+            return await ctx.reply(botMessage, {
+                reply_markup: menuKeyboard,
+                parse_mode: "HTML",
+            });
+        }
+        return await ctx.editMessageText(botMessage, {
             reply_markup: menuKeyboard,
             parse_mode: "HTML",
         });
+    } catch (error) {
+        console.error("Ошибка в sendMainMenu:", error);
     }
-
-    return await ctx.editMessageText(botMessage, {
-        reply_markup: menuKeyboard,
-        parse_mode: "HTML",
-    });
 }
 
-async function sendErrorMessage(error, ctx) {
-    await ctx.reply(
-        `⚠️ <b>Ой, что-то пошло не так!</b> 😔\n` +
-            `Попробуй снова или вернись в меню командой /start`,
-        { parse_mode: "HTML" }
-    );
-    console.error(error);
+async function sendErrorMessage(error, ctx, isNewMessage = true) {
+    const errorText = `⚠️ <b>Ой, что-то пошло не так!</b> 😔\nПопробуй снова или вернись в меню командой /start`;
+
+    try {
+        if (isNewMessage && ctx?.reply) {
+            await ctx.reply(errorText, { parse_mode: "HTML" });
+        } else if (ctx?.editMessageText) {
+            await ctx.editMessageText(errorText, { parse_mode: "HTML" });
+        }
+    } catch (e) {
+        console.error("Ошибка при отправке сообщения об ошибке:", e);
+    }
+
+    if (error) console.error("Ошибка:", error);
 }
 
 async function sendDontUnderstandMessage(ctx) {
-    await ctx.reply(
-        `🤔 <b>Ой, я не понял, что ты имел в виду!</b>\n` +
-            `Чтобы вернуться в меню, введи /start 🌟`,
-        { parse_mode: "HTML" }
-    );
+    try {
+        await ctx.reply(
+            `🤔 <b>Ой, я не понял, что ты имел в виду! Если хочешь поговорить, выбери в меню "Начать чат"</b>\n` +
+                `Чтобы вернуться в меню, введи /start 🌟`,
+            { parse_mode: "HTML" }
+        );
+    } catch (error) {
+        console.error("Ошибка в sendDontUnderstandMessage:", error);
+    }
 }
 
 async function handleEmergencyHelp(ctx) {
@@ -114,11 +146,15 @@ async function handleEmergencyHelp(ctx) {
 
     const backButton = new InlineKeyboard().text("❌ Назад", "cancel");
 
-    await ctx.answerCallbackQuery();
-    await ctx.editMessageText(emergencyMessage, {
-        reply_markup: backButton,
-        parse_mode: "HTML",
-    });
+    try {
+        await ctx.answerCallbackQuery();
+        await ctx.editMessageText(emergencyMessage, {
+            reply_markup: backButton,
+            parse_mode: "HTML",
+        });
+    } catch (error) {
+        console.error("Ошибка в handleEmergencyHelp:", error);
+    }
 }
 
 async function handleInDanger(ctx) {
@@ -138,11 +174,15 @@ async function handleInDanger(ctx) {
 
     const backButton = new InlineKeyboard().text("❌ Назад", "cancel");
 
-    await ctx.answerCallbackQuery();
-    await ctx.editMessageText(inDangerMessage, {
-        reply_markup: backButton,
-        parse_mode: "HTML",
-    });
+    try {
+        await ctx.answerCallbackQuery();
+        await ctx.editMessageText(inDangerMessage, {
+            reply_markup: backButton,
+            parse_mode: "HTML",
+        });
+    } catch (error) {
+        console.error("Ошибка в handleInDanger:", error);
+    }
 }
 
 async function handleFeelingBad(ctx) {
@@ -166,34 +206,80 @@ async function handleFeelingBad(ctx) {
 
     const backButton = new InlineKeyboard().text("❌ Назад", "cancel");
 
-    await ctx.answerCallbackQuery();
-    await ctx.editMessageText(feelingBadMessage, {
-        reply_markup: backButton,
-        parse_mode: "HTML",
-    });
+    try {
+        await ctx.answerCallbackQuery();
+        await ctx.editMessageText(feelingBadMessage, {
+            reply_markup: backButton,
+            parse_mode: "HTML",
+        });
+    } catch (error) {
+        console.error("Ошибка в handleFeelingBad:", error);
+    }
 }
 
 async function handleStartChat(ctx) {
     ctx.session.isChatting = true;
 
-    await ctx.answerCallbackQuery();
-    await ctx.editMessageText(
-        `💬 <b>Режим чата включён!</b>\n` +
-            `Пиши мне свои вопросы или мысли, я постараюсь помочь 😊\n` +
-            `Чтобы выйти в главное меню, введи /start`,
-        {
+    const backButton = new InlineKeyboard().text("❌ Назад", "cancel");
+    try {
+        await ctx.answerCallbackQuery();
+        await ctx.editMessageText(
+            `💬 <b>Режим чата включён!</b>\n` +
+                `Напиши мне свои вопросы или мысли, я постараюсь помочь 😊`,
+            {
+                reply_markup: backButton,
+                parse_mode: "HTML",
+            }
+        );
+    } catch (error) {
+        console.error("Ошибка в handleStartChat:", error);
+    }
+}
+
+async function handleSupport(ctx) {
+    const supportMessage =
+        `🌟 <b>Нужна поддержка?</b> 🌟\n` +
+        `Свяжись с нами:\n` +
+        `👉 <a href="https://t.me/tievest">@tievest</a>\n` +
+        `👉 <a href="https://t.me/teokor44">@teokor44</a>\n` +
+        `👉 <a href="https://t.me/dismantling_V">@dismantling_V</a>\n` +
+        `👉 <a href="https://t.me/nefarius_bulkinedit220">@nefarius_bulkinedit220</a>`;
+
+    const backButton = new InlineKeyboard().text("❌ Назад", "cancel");
+
+    try {
+        await ctx.answerCallbackQuery();
+        await ctx.editMessageText(supportMessage, {
+            reply_markup: backButton,
             parse_mode: "HTML",
-        }
-    );
+            disable_web_page_preview: true,
+        });
+    } catch (error) {
+        console.error("Ошибка в handleSupport:", error);
+    }
 }
 
 async function handleChatMessage(ctx) {
+    // Ограничение истории до 10 сообщений
+    if (ctx.session.conversationHistory.length > 10) {
+        ctx.session.conversationHistory =
+            ctx.session.conversationHistory.slice(-10);
+    }
+
     ctx.session.conversationHistory.push({
         role: "user",
         content: ctx.message.text,
     });
 
+    let waitingMessage;
     try {
+        waitingMessage = await ctx.reply("🔄 <b>Обрабатываю сообщение...</b>", {
+            parse_mode: "HTML",
+        });
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 25000); // Тайм-аут 25 секунд
+
         const response = await fetch(process.env.AI_API_URL, {
             method: "POST",
             headers: {
@@ -204,20 +290,52 @@ async function handleChatMessage(ctx) {
                 model: "mistral-large-2411",
                 messages: ctx.session.conversationHistory,
             }),
+            signal: controller.signal,
         });
-        const data = await response.json();
 
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+            if (response.status === 429) {
+                throw new Error("Слишком много запросов к API, попробуй позже");
+            }
+            throw new Error(
+                `Ошибка API: ${response.status} ${response.statusText}`
+            );
+        }
+
+        const data = await response.json();
         const assistantResponse = data.choices[0].message.content;
         ctx.session.conversationHistory.push({
             role: "assistant",
             content: assistantResponse,
         });
 
-        const botMessage = `${assistantResponse}\n\nЕсли хочешь прекратить чат, введи /start`;
+        const botMessage = `${assistantResponse}\n\nЕсли хочешь вернуться в меню, введи /start`;
 
-        await ctx.reply(botMessage);
+        await ctx.api.editMessageText(
+            ctx.chat.id,
+            waitingMessage.message_id,
+            botMessage,
+            { parse_mode: "HTML" }
+        );
     } catch (error) {
-        await sendErrorMessage(ctx);
-        console.error(error);
+        const errorMessage =
+            error.name === "AbortError"
+                ? "⚠️ <b>Бот не отвечает, попробуй еще раз или позже</b>\n" + "Чтобы вернуться в меню, введи /start"
+                : `⚠️ <b>Ошибка: ${error.message}</b>\nПопробуй снова или вернись в меню командой /start`;
+
+        try {
+            await ctx.api.editMessageText(
+                ctx.chat.id,
+                waitingMessage?.message_id,
+                errorMessage,
+                { parse_mode: "HTML" }
+            );
+        } catch (e) {
+            console.error("Ошибка при редактировании сообщения:", e);
+            await ctx.reply(errorMessage, { parse_mode: "HTML" });
+        }
+        console.error("Ошибка в handleChatMessage:", error);
     }
 }
