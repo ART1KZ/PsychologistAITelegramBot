@@ -1,10 +1,19 @@
 import { Bot, InlineKeyboard, session } from "grammy";
+import { psychologistPrompt } from "./systemPrompt.js";
 
 const bot = new Bot(process.env.BOT_TOKEN);
 
 bot.use(
     session({
-        initial: () => ({ isChatting: false }),
+        initial: () => ({
+            isChatting: false,
+            conversationHistory: [
+                {
+                    role: "system",
+                    content: psychologistPrompt,
+                },
+            ],
+        }),
     })
 );
 
@@ -26,18 +35,23 @@ bot.on("callback_query:data", async (ctx) => {
             await handleFeelingBad(ctx);
             break;
         case "start_chat":
-            // TODO: реализовать обработку кнопки "Начать чат", интегрировать с апи нейронки
+            await handleStartChat(ctx);
             break;
         case "cancel":
             await sendMainMenu(ctx, false);
             break;
+        default:
+            await sendErrorMessage(ctx);
+            break;
     }
 });
-
 bot.on("message", async (ctx) => {
-    if (!ctx.session.isChatting) {
+    if (!ctx.session.isChatting || !ctx.message.text) {
         await sendDontUnderstandMessage(ctx);
+        return;
     }
+
+    await handleChatMessage(ctx);
 });
 
 bot.catch(async (error, ctx) => {
@@ -85,7 +99,7 @@ async function sendErrorMessage(error, ctx) {
 async function sendDontUnderstandMessage(ctx) {
     await ctx.reply(
         `🤔 <b>Ой, я не понял, что ты имел в виду!</b>\n` +
-            `Чтобы вернуться в меню, напиши /start 🌟`,
+            `Чтобы вернуться в меню, введи /start 🌟`,
         { parse_mode: "HTML" }
     );
 }
@@ -157,4 +171,53 @@ async function handleFeelingBad(ctx) {
         reply_markup: backButton,
         parse_mode: "HTML",
     });
+}
+
+async function handleStartChat(ctx) {
+    ctx.session.isChatting = true;
+
+    await ctx.answerCallbackQuery();
+    await ctx.editMessageText(
+        `💬 <b>Режим чата включён!</b>\n` +
+            `Пиши мне свои вопросы или мысли, я постараюсь помочь 😊\n` +
+            `Чтобы выйти в главное меню, введи /start`,
+        {
+            parse_mode: "HTML",
+        }
+    );
+}
+
+async function handleChatMessage(ctx) {
+    ctx.session.conversationHistory.push({
+        role: "user",
+        content: ctx.message.text,
+    });
+
+    try {
+        const response = await fetch(process.env.AI_API_URL, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${process.env.AI_API_TOKEN}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                model: "mistral-large-2411",
+                messages: ctx.session.conversationHistory,
+            }),
+        });
+        const data = await response.json();
+
+        const assistantResponse = data.choices[0].message.content;
+        ctx.session.conversationHistory.push({
+            role: "assistant",
+            content: assistantResponse,
+        });
+
+        const botMessage = `${assistantResponse}\n\nЕсли хочешь прекратить чат, введи /start`;
+
+        await ctx.reply(botMessage);
+    } catch (error) {
+        await sendErrorMessage(ctx);
+        console.error(error);
+    }
 }
