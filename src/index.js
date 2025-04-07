@@ -49,9 +49,6 @@ bot.on("callback_query:data", async (ctx) => {
         case "start_chat":
             await handleStartChat(ctx);
             break;
-        case "support":
-            await handleSupport(ctx);
-            break;
         case "cancel":
             await sendMainMenu(ctx, false);
             break;
@@ -86,8 +83,6 @@ async function sendMainMenu(ctx, isNewMessage = true) {
         .text("😔 Мне плохо", "feeling_bad")
         .row()
         .text("💬 Начать чат", "start_chat")
-        .text("🤝 Поддержка", "support")
-        .row()
         .text("🚨 Экстренная помощь", "emergency_help")
         .row()
         .url("📝 Пройти тест на уровень стресса", process.env.STRESS_TEST_URL);
@@ -233,29 +228,6 @@ async function handleStartChat(ctx) {
         );
     } catch (error) {
         console.error("Ошибка в handleStartChat:", error);
-    }
-}
-
-async function handleSupport(ctx) {
-    const supportMessage =
-        `🌟 <b>Нужна поддержка?</b> 🌟\n` +
-        `Свяжись с нами:\n` +
-        `👉 <a href="https://t.me/tievest">@tievest</a>\n` +
-        `👉 <a href="https://t.me/teokor44">@teokor44</a>\n` +
-        `👉 <a href="https://t.me/dismantling_V">@dismantling_V</a>\n` +
-        `👉 <a href="https://t.me/nefarius_bulkinedit220">@nefarius_bulkinedit220</a>`;
-
-    const backButton = new InlineKeyboard().text("❌ Назад", "cancel");
-
-    try {
-        await ctx.answerCallbackQuery();
-        await ctx.editMessageText(supportMessage, {
-            reply_markup: backButton,
-            parse_mode: "HTML",
-            disable_web_page_preview: true,
-        });
-    } catch (error) {
-        console.error("Ошибка в handleSupport:", error);
     }
 }
 
