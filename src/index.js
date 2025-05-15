@@ -5,7 +5,8 @@ import { psychologistPrompt } from "./systemPrompt.js";
 if (
     !process.env.BOT_TOKEN ||
     !process.env.AI_API_URL ||
-    !process.env.AI_API_TOKEN
+    !process.env.AI_API_TOKEN || 
+    !process.env.STRESS_TEST_URL
 ) {
     console.error(
         "Ошибка: Не заданы BOT_TOKEN, AI_API_URL или AI_API_TOKEN в .env"
@@ -232,12 +233,6 @@ async function handleStartChat(ctx) {
 }
 
 async function handleChatMessage(ctx) {
-    // Ограничение истории до 10 сообщений
-    if (ctx.session.conversationHistory.length > 10) {
-        ctx.session.conversationHistory =
-            ctx.session.conversationHistory.slice(-10);
-    }
-
     ctx.session.conversationHistory.push({
         role: "user",
         content: ctx.message.text,
